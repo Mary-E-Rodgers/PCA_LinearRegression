@@ -1,0 +1,468 @@
+---
+title: "Rodgers_Assignment3"
+author: "Mary E. Rodgers"
+date: '2023-04-19'
+output: 
+
+  html_document: 
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **1 Introduction**
+
+Seven to 10 children out of every 100 will be diagnosed with a specific language impairment (SLI) by the time they reach kindergarten by exhibiting symptoms of delays in language development (e.g., speaking, listening, reading and writing skills [1]. Specific symptoms include impairments in vocabulary and grammar [2], which are comorbid with challenging behavior [3]. Several standardized measures can be used to identify delays in expressive (i.e., saying) and receptive (i.e., understanding) language development such as Preschool Language Scales [4] through the production of a standard score and an age equivalence. However, understanding a child's current level of language development can also be viewed in stages of syntactical and morphological development [5]. However, more recent research hypothesizes that the number of unique nouns and verbs predict more linguistic growth [6, 7]. Given the unique nature of language development in children with SLI, it is important to understand how measures of expressive language development cluster together when analyzing transcripts of their language. Additionally, it is important to understand if the cluster containing the number of verbs followed by a noun is predictive of more complex stages of linguistic development, such as contractible auxiliary verbs [5].
+
+## *1.1 Research Questions*
+
+Our primary research question was: 1) What components can be made from the linguistic data pulled from transcripts of children? This research question will be answered through Principal Component Analysis (PCA).
+
+Our secondary research question was: 2) Does the number of nouns followed by a verb (n_v) containing cluster predict more complex language? This research question will be answered through a machine learning linear regression of the predictor components and the outcome component containing the of number of number on nouns followed by a verb (n_v) using R [8].
+
+## *1.2 Data*
+
+The current data set was obtained from kaggle.com from user DGOKE1, containing 1163 instances of language data derived from transcripts of children between the ages of four to fifteen completing a wordless picture task [9, 10, 11]. This particular data set was created from three different data sets. The data set discrition on Kaggle indicated 1163 children, 919 typically developing and 346 with SLI. Future analysis of the data indicated that 267 children with SLI were in the data set.
+
+The variables representing raw transcript data from the child that were included in this analysis were:
+
+-   child_TNW, the total number of words
+
+-   child_TNS, the total number of sentences
+
+-   freq_ttr, the frequency of word types to work token ratio
+
+-   r_2\_i_verbs, the ratio of raw to inflected verbs
+
+-   mor_words, the number of words in the mor tier
+
+-   num_pos_tags, the number of different part-of-speech tags
+
+-   n_dos, the number of times the child says 'do'
+
+-   repetition, the number of repetitions
+
+-   retracing, the number of times an utterance is abandoned and continues again
+
+-   fillers, the number of filler words (e.g., um, uh)
+
+-   average_syl, the average number of syllables per word
+
+-   mlu_words, the mean length of the words
+
+-   mlu_morphemes, the mean length of sentences
+
+-   verb_utt, the number of utterances consisting of verbs
+
+-   present_progressive, the number of present progressives
+
+-   preposition_in, the number of times 'in' is used
+
+-   preposition_on, the number of times 'on' is used
+
+-   plural_s, the number of times a plural is used
+
+-   irregular_past_tense, the number of times an irregular past tense is used
+
+-   posessive_s, the number of times a posessive is used
+
+-   uncontractible_copula, the number of times an uncontractible copula is used
+
+-   articles, the number of articles (i.e., a, an, the)
+
+-   regular_past_ed, the number of times a regular past tense is used
+
+-   regular_3rd_person_s, the number of times a regular third person is used
+
+-   uncontractible_aux, the number of times an uncontractible auxiliary is used
+
+-   contractible_copula, the number of times a contractible copula is used
+
+-   contractible_aux, the number of times a contractible auxiliary verb is used
+
+-   word_errors, the number of word errors in the transcript
+
+-   n_v, the number of nouns followed by a verb
+
+-   n_aux, the number nouns followed by an auxiliary verbs
+
+-   n_3s_v, the number of third singular nouns followed by a verb
+
+-   det_n\_pl, the number of determinant nouns followed by a personal pronoun
+
+-   det_pl_n, the number of determinant pronouns followed by a noun
+
+-   pro_aux, the number of pronouns followed by an auxillary verb
+
+-   pro_3s_v, the number of thir signular nominative pronouns followed by a verb
+
+Source: <https://www.kaggle.com/datasets/dgokeeffe/specific-language-impairment>
+
+## *1.3 Git Hub*
+
+<https://github.com/Mary-E-Rodgers/PCA_LinearRegression.git>
+
+# **2 Methods**
+
+## *2.1 Data wrangling*
+
+### 2.1.1 Preparing R
+
+First we connected to the CRAN mirror and clear the global environment.
+
+```{r}
+options(repos=c(CRAN="https://mirrors.nics.utk.edu/cran/"))
+
+rm(list=ls(all=TRUE))
+```
+
+Alternatively, you can select the 'sweep' button in the global environment
+
+![](images/sweep.PNG){width="84"}
+
+The necessary R packages can then be pulled in.
+
+```{r}
+library(tidyverse) # this package contains tools for data cleaning and organization
+library(ggplot2) # this is used for data visualization
+library(dplyr) # this contains tools for data manipulation
+library(caret) # this contains functions for classification and regression raining
+library(car) # this is for variance inflation factor (VIF)
+library(corrplot) # this package is for visualizing your correlation
+library(relaimpo) # this is for variable importance
+library(PerformanceAnalytics) # this contains tools for performance and risk analysis
+library(glmnet) # this is for modeling generalized linear models
+library(psych) # this is for descriptive statistics
+library(relaimpo) # this is for calculating metrics for linear modeling
+library(stringr) #  this is a wrapper for common string applications
+```
+
+### 2.1.2 Importing your Data
+
+The .csv data set was downloaded and saved with the R software so that it imported properly.
+
+Source: [Kaggle Data Set] (<https://www.kaggle.com/datasets/dgokeeffe/specific-language-impairment>)
+
+A tibble can then be created from the csv file.
+
+```{r}
+all_data_R_tib <- read_csv("all_data_R.csv")
+```
+
+### 2.1.3 Cleaning your Data
+
+Messages and warnings about the code were enabled, and the tibble was called in. This tibble contained all of variables from the original .csv file that was downloaded. The variable of interests were selected using dplyr, and the structure was displayed.
+
+```{r message=TRUE, warning=TRUE}
+# enables messages and warnings about your code
+all_data_R_tib <- read_csv("all_data_R.csv") %>% 
+  filter(Y == 1) # creates a tibble from the CSV, only for the SLI sample
+
+all_data_R_tib <- all_data_R_tib %>% 
+  dplyr::select (child_TNW, child_TNS, freq_ttr, r_2_i_verbs, mor_words, num_pos_tags, n_dos, repetition, retracing, fillers, average_syl, mlu_words, mlu_morphemes, verb_utt, present_progressive, propositions_in, propositions_on, plural_s, irregular_past_tense, possessive_s, uncontractible_copula, articles, regular_past_ed, regular_3rd_person_s, uncontractible_aux, contractible_copula, contractible_aux, word_errors, n_v, n_aux, n_3s_v, det_n_pl, det_pl_n, pro_aux, pro_3s_v, dss, ipsyn_total, f_k) # calls in the columns you want
+
+
+
+str(all_data_R_tib) # this displays our clean tibble
+```
+
+#### 2.1.4 Visually checking the data
+
+The tibble was visually checked. At this point it was noted that there were only 267 SLI children in the data set, not the 346 reported by the Kaggle author.
+
+```{r}
+print(all_data_R_tib)
+```
+
+## *2.2. Checking for multi-collinearity between variables*
+
+### 2.2.1 Correlations
+
+A correlation was run on the entire tibble.
+
+```{r}
+cor(all_data_R_tib) # this creates a correlation between your entire tibble
+```
+
+### 2.2.2 Check for multi-collinearity
+
+Using a statistical approach, multi-collinearity was checked by looking for correlations of the entire tibble and identifying anything with a correlation of 0.70 or above.
+
+Correlations above 0.70 were identified in child TNS with child_TNW (r = 0.91), mor_words (r = 0.92), uncontractible_copula (r = 0.77), articles (r = 0.71), and uncontractible_aux (r = 0.71), and freq_ttr (r = 0.79). Correlations above 0.70 were identified in mor_words with child_TNW (r = 0.98), present_progressive (r = 0.73), irregular_past_tense (r = 0.74), uncontractible_copula (r = 0.86), and uncontractible_aux (0.75). Correlations above 0.70 were identified between freq_ttr and child_TNW (r = -0.78). Correlations above 0.70 were identified in uncontractible_copula and child_TNW (r = 0.84) and irregular_past_tense (0.73). Correlations above 0.70 were identified between irregular_past_tense and child_TNW (0.74) and regular past_ed (0.76). Correlations above 0.70 were identified between uncontractible_aux and child_TNW (r = 0.72) and present_progressive (r = 0.93). Correlations above 0.70 were identified between mlu_morphemes and mlu_words (r = 0.99) and verb_utt (r = 0.79.). Correlations above 0.70 were identified between between mlu_words and verb_utt (r = 0.79). Correlations above 0.70 were identified between retracing and articles (r = 0.75). Correlations above 0.70 were identified between det_n\_pl and plural_s (r = 0.95). Correlations above 0.70 were identified between regular_3rd_person_s and n_3s_v (r = 0.71).
+
+To remove multi-collinearity caused by the variables child_TNS, mor_words, freq_ttr, uncontractible_copula, irregular_past_tense, uncontractible_aux, mlu_morphemes, mlu_words, retracing, den_n\_pl and regular_3rd_person_s, the aforementioned variables were removed.
+
+```{r}
+model2_tib <- all_data_R_tib %>% #selecting the same variables but without child TNS
+  dplyr::select (child_TNW, r_2_i_verbs, num_pos_tags, n_dos, repetition, fillers, average_syl, verb_utt, present_progressive, propositions_in, propositions_on, plural_s, possessive_s, articles, regular_past_ed, contractible_copula, contractible_aux, word_errors, n_v, n_aux, n_3s_v, det_pl_n, pro_aux, pro_3s_v)
+
+model2_tib_sc <- model2_tib %>% # scaling the data again
+  na.omit() %>% 
+
+cor(model2_tib) #running the correlation again
+```
+
+The smaller tibble was checked again for correlations above 0.70, in case any were missed.
+
+```{r}
+cor(model2_tib)
+```
+
+The second model does not contain any predictors correlating with each other above 0.70, indicating that multi-collinearity is no longer present.
+
+## *2.3 Scale Variables*
+
+The data in the tibble were scaled.
+
+```{r}
+model2_tib_sc <- model2_tib %>% 
+  na.omit() %>% 
+  mutate_at(c(1:24), ~(scale(.) %>% as.vector))
+
+str(model2_tib_sc)
+```
+
+## *2.4 Visualize the Data*
+
+A correlation matrix of the scaled model two was created.
+
+```{r}
+cor_matrix <- abs(cor(model2_tib_sc))
+```
+
+The correlation matrix of model four was visualized to assist in verifying no correlations over 0.70 are present.
+
+```{r}
+corrplot(cor_matrix, 
+         type="lower", #put color strength on bottom
+         tl.pos = "ld", #Character or logical, position of text labels, 'ld'(default if type=='lower') means left and diagonal,
+         tl.cex = 0.5, #Numeric, for the size of text label (variable names).
+         method="color", 
+         addCoef.col="black", 
+         diag=FALSE,
+         tl.col="black", #The color of text label.
+         tl.srt=45, #Numeric, for text label string rotation in degrees, see text
+         is.corr = FALSE, #if you include correlation matrix
+         number.digits = 2) #number of digits after decimal
+```
+
+Although the exact values of the correlation matrix between the current variables are difficult to see, our visual allows us to see that the highest correlation present is 0.69, indicating no multi-collinearity is present.
+
+## *2.5. Bartlett's Test*
+
+Bartlett's test was used to see if the variables are related enough to be combined together into components.
+
+```{r}
+cortest.bartlett(model2_tib_sc, 267) # 267 indicates our sample size
+```
+
+Bartlett's test revealed that the R-matrix was not an identity matrix (p \< .05), indicating that there is some relationship between the variables in the identity matrix. This allows us to conduct the PCA.
+
+## *2.6 Kaiser-Meyer-Olkin (KMO) Assessment of Sampling Adequacy*
+
+Variables below 0.5 were identified and removed, to ensure the sample size for each variable was adequate.
+
+```{r}
+KMO(model2_tib_sc)
+```
+
+No variable in the model was below 0.5, indicating that all current variables are adequate in number for the PCA.
+
+## *2.7 Baseline PCA to Check Sree Plot*
+
+The data were checked for SS loadings above 1 to determine the number of components in the PCA, and visually checked using a scree plot.
+
+```{r}
+pca_base <- principal(model2_tib_sc, nfactors = 24, rotate = "none")
+
+pca_base
+
+plot(pca_base$values, type = "b")
+```
+
+Based on the SS loadings and the sree plot, five components were chosen.
+
+## *2.8 Normal Distribution of Residuals*
+
+The data were checked for the normal distribution of residuals.
+
+```{r}
+pca_resid <- principal(model2_tib_sc, nfactors = 5, rotate = "none")
+pca_resid
+
+corMatrix<-cor(model2_tib_sc)
+
+residuals<-factor.residuals(corMatrix, pca_resid$loadings)
+
+hist(residuals)
+```
+
+The data appear to be normally distributed.
+
+## *2.9 PCA with Selected Number of Components*
+
+A PCA and visual of the PCA was performed with five components, based on the interpretation of the sree plot and SS loadings.
+
+```{r}
+pca_final <- principal(model2_tib_sc, nfactors = 5, rotate = "promax")
+pca_final
+
+print.psych(pca_final, cut = 0.3, sort = TRUE)
+
+plot(pca_final)
+
+fa.diagram(pca_final)
+```
+
+## *2.10 Interpretation of Components*
+
+At this point, the components were evaluated and labeled accordingly. Although an arbitrary process, the components were labeled by looking for similarities within the components to the stages of syntactical and morphological development [5].
+
+Component 1 contained n_v (0.84), repetition (0.77), n_dos (0.75), n_aux (0.65), articles (0.65), child_TNW (0.63), pro_3s_v (0.56), and fillers (0.51). Component 1 was named "Stage3".
+
+Component 2 contained verb_utt (0.75), num_pos_tags (0.64), regular_past_ed (0.61), r_2\_i_verbs (-0.59), and average_syl (0.46). Component 2 was named "Stage2".
+
+Component 5 contained possessives (0.68), plurals (0.62), prepositions_in (0.60), word_errors (0.47), and prepositions_on (0.41). Component 5 was named "Stage1".
+
+Component 4 contained contractible_copula (0.75), contractible_aux (0.74), and det_pl_n (0.37) Component 4 was named "Stage5".
+
+Component 3 contained n_3s_v (0.69), pro_aux (0.63), det_pl_n (0.54), and present_progressive (0.45). Component 3 was named "Stage4".
+
+```{r}
+pca_final_scores <- as.data.frame(pca_final$scores) #scores for each text on each factor. You can use these in subsequent analyses. Lot's of them though
+
+#rename columns
+pca_final_scores <- pca_final_scores %>% 
+  rename(Stage3 = RC1, Stage2 = RC2, Stage4 = RC3, Stage5 = RC4, Stage1 = RC5)
+
+str(model2_tib_sc)
+```
+
+## *2.11 Creation of Component CSV*
+
+A CSV of the components was created.
+
+```{r}
+component_csv <- cbind(model2_tib_sc, pca_final_scores)
+str(component_csv)
+
+write.csv(component_csv,"pca_scores_final_df.csv", row.names=FALSE)
+```
+
+## *2.12 Modeling Data using Component Scores*
+
+### 2.12.1 Cross-validated model with feature selection
+
+A machine learning approach was used to create a cross-validated model with feature selection using the 10 fold lm method using caret.
+
+```{r}
+component_tib <- read_csv("pca_scores_final_df.csv")
+
+component_tib <- component_tib %>% 
+  dplyr::select (Stage1, Stage2, Stage3, Stage4, Stage5)
+
+set.seed(1234)
+
+train.control <- trainControl(method = "cv", number = 10) 
+# cv = cross validated, 10 = 10 fold
+
+machinemodel_1 <- train(Stage5 ~ ., data = component_tib,
+                        method = "leapSeq", #stepwise selection 
+                       tuneGrid = data.frame(nvmax = 1:5),
+                       trControl = train.control)
+
+summary(machinemodel_1) 
+
+machinemodel_1$bestTune 
+#the three best variables of the machine learning models                     
+machinemodel_1$results
+summary(machinemodel_1$finalModel)
+```
+
+From the machine model, the coefficients can then be checked for suppression effects.
+
+### 2.12.2 Suppression Effects
+
+The model was checked for suppression effects by looking at the correlations between the predictors and the outcome variable, Stage5, to see if any negative correlations existed. No suppression effects were observed.
+
+```{r}
+coef(machinemodel_1$finalModel, 2)
+```
+
+### 2.12.4 Producing the final model using cross-validation
+
+Using the machine learning approach with cross-validation and accounting for suppression effects, it was found that only Stage3 and Stage4 were significant predictors of Stage5.
+
+The RMSE for Stage3 was 1.03, with an r squared of 0.08. The RMSE for number of Stage4 was 0.98, with an r squared of 0.18.
+
+```{r}
+summary(machinemodel_1$finalModel)
+```
+
+### 2.12.5 Produce the final model without cross-validation to get statistical information
+
+A final model without cross-validation was written for the linear model to produce the statistical metrics.
+
+The t value for Stage3 was -1.951 (p \< 0.05), and the t value for Stage4 was -4.083 (p = \< 00). The F statistic was 12.03.
+
+```{r}
+finalmodel <- lm(Stage5 ~ Stage3 + Stage4, data = component_tib)
+
+summary(finalmodel)
+```
+
+### 2.12.6 Visualize using a scatter plot
+
+The final model was visualized by creating a scatter plot.
+
+```{r}
+component_tib <- read_csv("pca_scores_final_df.csv")
+
+component_tib <- component_tib %>% 
+  dplyr::select (Stage3, Stage4, Stage5)
+
+ggplot(component_tib, aes(x=predict(finalmodel), y= component_tib$Stage5)) +
+  geom_point() +
+  geom_abline(intercept=0, slope=1) +
+  labs(x='Predicted Values', y='Actual Values', title='Predicted vs. Actual Values')
+```
+
+# **3 Discussion**
+
+In response to the primary research question, "What components can be made from the linguistic data pulled from transcripts of children?", were were able to make five components.
+
+There was an interesting overlap in the variables within the components across the developmental stages of syntactic and morphological development as described by Bowen (1998). Some definition could be seen between the components. However, a smaller number of components may have created more distinct groupings indicating stages of language development. The SS loadings and sree plot indicated that as few as three components would have been acceptable. Additionally, there was significant muli-colinearity observed that led to several variables being removed from the analysis. This was not surprising, as all were measures of language. The remaining variables did have some relationship among them, as the Bartlett's test was significant. It was also discovered that there were only 267 children diagnosed with SLI in the csv file the analysis was done on, not the 346 reported by the Kaggle author. However, the KMO analysis indicated that the sample was sufficient for a PCA. Lastly, the distribution of the residuals appeared normal.
+
+In response to the secondary research question, 2) "Does the number of nouns followed by a verb (n_v) containing cluster predict more complex language?", we can say yes. In line with previous [5] and current [6,7] research, number of nouns followed by verbs occures developmentally before more complex forms of language such as contractible auxillary verbs [5] as seen in Stage5, the outcome variable.
+
+The number of nouns followed by a verb (n_v), was within the component named Stage3. The components Stage1, Stage2, Stage3, and Stage4 were used as predictor variables for Stage5. Before running the linear regression, the data were checked for suppression effects. None were found. The RMSE for Stage3 was 1.03, with an r squared of 0.08. The RMSE for number of Stage4 was 0.98, with an r squared of 0.18. The t value for Stage3 was -1.951 (p \< 0.05), and the t value for Stage4 was -4.083 (p = \< 00). The F statistic was 12.03. These results are not surprising, as children with more nouns followed by verbs are likely to have more complex language as well, such as contractible auxiliary verbs. As this data set are from one sample with no post, a future analysis analyzing pre post data of the number of nouns followed by a verb at baseline and the number of contractible auxillary verbs at post intervention would help us better understand what fundamental language components contribute to more complex expressive language.
+
+Other measures of linguistic growth not available in this data set, such as the number of unique subjects, number of unique verbs, and number of unique subject-verb combinations (i.e., sentence diversity) should analyzed to see if they are better predictors of linguistic growth [7, 12].
+
+# **4 References**
+
+1.  National Institute of Health, Deafness and Other Communication Disorders. NIDCD Fact Sheet: Voice Speech and Language, Specific Language Impairment. U.S. Department of Health and Human Services.
+
+2.  Curtis, P. R., Roberts, M. Y., Estabrook, R., & Kaiser, A. P. The longitudinal effects of early language intervention on Children's Problem Behaviors. *Child Development*. 2017; 90(2): 576-592.
+
+3.  Ervin, M. SLI: what we know and why it matters. *American Speech and Hearing Association*. 2001; 6(12).
+
+4.  Zimmerman, I. L., Steiner, V. G., & Pond, R. E. Preschool Language Scale, Fifth Edition (PLS-5) [Database record]. PsycTESTS. 2011.
+
+5.  Bowen, C. Brown's Stages of Syntactic and Morphological Development. 1998.
+
+6.  Hadley, P. Exploring sentence diversity at the boundary of typical and impaired language abilities. *Journal of Speech, Language, and Hearing Research*. 2020; 63: 3236-3251.
+
+7.  Hadley, P., McKenna, M., & Rispoli, M. Sentence diversity in early language development: Recommendations for target selection and progress monitoring. American Journal of Speech-Language. 2018; 27: 553-565.
+
+8.  RStudio Team. RStudio: Integrated Development for R. RStudio, PBC, Boston, MA, 2020.
+
+9.  D. Wetherell, N. Botting, and G. Conti-Ramsden. Narrative skills in adolescents with a history of SLI in relation to non-verbal IQ scores. *Child Language Teaching and Therapy*. 2007; 23(1): 95--113.
+
+10. Schneider, D. Hayward, and R. V. Dub. Storytelling from pictures using the Edmonton Narrative Norms Instrument, 2006.
+
+11. Gillam, R. Pearson, N. Test of Narrative Language. Austin, TX: Pro-Ed Inc., 2004.
+
+12. Kaiser, A., Roberts, M, & Hadley, P. Maximizing outcomes for preschoolers with developmental language disorder: Testing the effects of a sequentially targeted naturalistic intervention. In Preparation. \`\`\`
